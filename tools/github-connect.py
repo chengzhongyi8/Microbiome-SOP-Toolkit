@@ -33,6 +33,7 @@ Notes
 - api.github.com is usually reachable even when github.com is not, so the
   GitHub API (repo creation, etc.) typically works without this tool.
 """
+import json
 import os
 import socket
 import subprocess
@@ -66,8 +67,35 @@ def probe(ip, timeout=4):
         return False
 
 
+def official_web_ips():
+    """Fetch GitHub's current web IP list from api.github.com/meta (usually
+    reachable even when github.com is blocked).  Only concrete /24-or-larger
+    entries are returned; api.github.com is excluded (it must stay direct)."""
+    try:
+        r = subprocess.run(
+            ["curl", "-s", "--max-time", "10", "https://api.github.com/meta"],
+            capture_output=True, text=True)
+        meta = json.loads(r.stdout)
+        out = []
+        for cidr in meta.get("web", []):
+            if "/" not in cidr:
+                continue
+            base, plen = cidr.split("/")
+            try:
+                plen = int(plen)
+            except ValueError:
+                continue
+            if plen >= 24:
+                out.append(base)
+        return out
+    except Exception:
+        return []
+
+
 def pick():
-    for ip in CANDIDATES:
+    # 1) official GitHub web IPs (auto-updating), then 2) hardcoded fallback
+    candidates = official_web_ips() or CANDIDATES
+    for ip in candidates:
         if probe(ip):
             return ip
     return None
