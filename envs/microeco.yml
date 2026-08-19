@@ -1,0 +1,26 @@
+# R environment for microeco / file2meco downstream analysis (16S workflow,
+# optional final validation step).
+#
+# Usage:
+#   conda env create -f envs/microeco.yml
+#   conda activate microeco
+#   Rscript -e 'install.packages("remotes", repos="https://cloud.r-project.org")'
+#   Rscript -e 'remotes::install_github("ChiLiubio/file2meco")'
+#   Rscript -e 'remotes::install_github("ChiLiubio/microeco")'
+#
+# file2meco/microeco are not on conda channels; they are installed from GitHub
+# with the remotes package (see envs/README.md).  The 16S workflow only needs
+# this environment when RUN_FILE2MECO_VALIDATION is enabled.
+name: microeco
+channels:
+  - conda-forge
+dependencies:
+  - r-base>=4.2
+  - r-remotes
+  - r-data.table
+  - r-ape
+  - r-vegan
+  - r-igraph
+  - r-ggpubr
+  - bioconductor-phyloseq
+  - bioconductor-dada2

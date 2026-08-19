@@ -1,0 +1,92 @@
+# ---------------------------------------------------------------------------
+# Microbiome-SOP-Toolkit .gitignore
+#
+# Never commit raw sequencing data, intermediate analysis files, databases,
+# logs, or anything machine-specific.
+# ---------------------------------------------------------------------------
+
+# --- Sequencing & analysis data --------------------------------------------
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.bam
+*.bam.bai
+*.sam
+*.fa.gz
+*.fna.gz
+*.faa.gz
+*.fq.bz2
+
+# --- QIIME2 / analysis artifacts --------------------------------------------
+*.qza
+*.qzv
+*.qzv.tmp
+*.qza.tmp
+*.biom
+
+# --- Databases (never commit large databases) ------------------------------
+database/
+db/
+*_db/
+*.dmnd
+*.bt2
+*.bt2l
+*.fai
+*.bwt
+*.pac
+*.ann
+*.amb
+*.sa
+*.mmi
+*.kraken
+*.k2d
+
+# --- Project outputs ---------------------------------------------------------
+results/
+work/
+logs/
+tmp/
+*.log
+*.pbs.o*
+*.pbs.e*
+out/
+*.out
+
+# --- Local configuration with real machine paths ----------------------------
+config.local.sh
+*.local.sh
+generated.env
+.env
+~/.mg-sop.conf
+~/.qiime2-sop.conf
+*.conf
+
+# --- Python / build artifacts ------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+
+# --- macOS / editor ----------------------------------------------------------
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.iml
+
+# --- Large or personal files -------------------------------------------------
+*.zip
+*.pdf
+*.docx
+*.xlsx
+*.png
+*.jpg
+*.jpeg
+*.tiff
+kegg_download/
+.private*/

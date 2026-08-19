@@ -1,0 +1,55 @@
+#!/bin/bash
+#PBS -N metagenome_sop
+#PBS -l nodes=1:ppn=32
+#PBS -l walltime=168:00:00
+#PBS -j oe
+# Output lands in the submission directory (metagenome_sop.o<JOBID>);
+# the real pipeline log is <project>/logs/pipeline.log
+
+# ============================================================================
+# Metagenome workflow — PBS submission template
+#
+# Usage:
+#   1) Edit PIPE_DIR / PROJECT_DIR / FASTQ_DIR and any options below
+#      for your project (all values are placeholders);
+#   2) qsub run_metagenome.pbs.template
+#      (or better: use `mg-sop --input ... --submit` which generates
+#       a ready-to-run PBS script automatically)
+#
+# Notes:
+#   - --qc-needed yes : run kneaddata QC + host removal (unprocessed data)
+#                   no : data already clean; only remove host
+#   - --host-genome    : bowtie2 index prefix of the host genome;
+#                        without an index use --host-fasta to auto-build.
+#   - --adapters       : trimmomatic adapter file, e.g.
+#                        $CONDA_PREFIX/share/trimmomatic-*/adapters/TruSeq3-PE-2.fa
+#   - --assembly       : per-sample | co-assembly | both
+#   - --binning        : metawrap or none; quality assessed with CheckM2
+#   - --threads * --jobs must stay within the node's total cores (ppn)
+# ============================================================================
+
+set -euo pipefail
+
+PIPE_DIR=/path/to/Microbiome-SOP-Toolkit
+PROJECT_DIR=/path/to/your_project_mg        # edit: your project dir
+FASTQ_DIR=/path/to/your_project_mg/seq      # edit: your reads dir
+# GROUP_FILE=/path/to/groups.tsv             # optional: per-group co-assembly
+
+cd "${PIPE_DIR}"
+
+bash bin/run_metagenome.sh \
+  --project-dir   "${PROJECT_DIR}" \
+  --input         "${FASTQ_DIR}" \
+  --qc-needed     yes \
+  --host-genome   /path/to/host_db/wheat/wheat \
+  --assembly      co-assembly \
+  --cluster       mmseqs2 \
+  --quant         salmon \
+  --taxonomy      nr-megan \
+  --function      eggnog \
+  --binning       none \
+  --threads       28 \
+  --jobs          8 \
+  --memory-gb     128
+# To enable MAG binning (MetaWRAP):
+#   --binning metawrap --binners metabat2,maxbin2,concoct --run-drep yes

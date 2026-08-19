@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# qiime2-sop: 一键运行 QIIME2 扩增子 SOP。
+#
+# 用法:
+#   qiime2-sop --fastq-dir DIR --region REGION --classifier CLS.qza [选项]
+#
+# 必选参数:
+#   --fastq-dir DIR        原始 FASTQ 目录
+#                          要求: 目录内含成对文件，如 BA10_R1.fastq.gz / BA10_R2.fastq.gz
+#   --region REGION        扩增区域（决定引物）。可选值见 qiime2_amplicon/primers.tsv：
+#                          16S_V4, 16S_V5V7, 16S_V3V4, ITS1, ITS2, 18S_V4, COI ...
+#                          也可以用 --forward-primer/--reverse-primer 直接给引物序列
+#   --classifier PATH      分类器 .qza 文件
+#
+# 可选参数:
+#   --metadata FILE        metadata TSV。第一列 #SampleID，须与文件名中的样本 ID 一致；
+#                          不填则自动生成（只有样本 ID 一列）。
+#   --project-dir DIR      输出目录。默认规则见配置文件里的 QIIME2_SOP_OUTPUT_ROOT。
+#   --forward-primer SEQ   正向引物序列（覆盖 region 默认），如 AACMGGATTAGATACCCKG
+#   --reverse-primer SEQ   反向引物序列（覆盖 region 默认），如 ACGTCATCCCCACCTTCC
+#   --threads N            DADA2/分类/建树线程数，默认 32
+#   --min-samples N        prevalence 过滤：ASV 至少出现在 N 个样本中才保留。
+#                          默认 2；填 0 或留空 = 不过滤。
+#   --max-ee N             DADA2 最大期望错误数，默认 2.0；质量差可放宽到 5
+#   --mode paired|single   测序类型，默认 paired
+#   --submit               生成 PBS 并 qsub 提交到集群（不加则前台直接运行）
+#   --pbs-nodes S          PBS 节点设置，默认 node01:ppn=64；不允许指定节点就写 1:ppn=64
+#   --walltime HH:MM:SS    PBS 时长，默认 48:00:00
+#   --conda-sh PATH        conda.sh 路径，默认 /home/user/anaconda3/etc/profile.d/conda.sh
+#   --dry-run              只打印将执行的命令，不运行
+#   --init-config          生成配置文件模板 ~/.qiime2-sop.conf（若不存在）后退出
+#
+# 自动行为:
+#   - 自动检测原始 reads 5' 端是否还有引物 -> 自动设置 trim-left
+#     （有引物: trim-left=引物长度；无引物(公司已剪): 0/0）
+#   - trunc 由估计器按读长自动定；cutadapt 默认关闭。
+#
+# 配置文件 ~/.qiime2-sop.conf（可选，命令行参数优先）:
+#   QIIME2_SOP_THREADS=32
+#   QIIME2_SOP_MIN_SAMPLES=2
+#   QIIME2_SOP_OUTPUT_ROOT=/home/user/JAAS     # 输出根目录习惯
+#   QIIME2_SOP_PBS_NODES=node01:ppn=64
+#   QIIME2_SOP_WALLTIME=48:00:00
+#   QIIME2_SOP_MAX_EE=2.0
+#   QIIME2_SOP_MODE=paired
+#   QIIME2_SOP_CONDA_SH=/home/user/anaconda3/etc/profile.d/conda.sh
+set -euo pipefail
+
+# 解析软链，确保通过 /home/user/bin/qiime2-sop 这类软链调用时也能找到真实流水线目录
+_SRC="${BASH_SOURCE[0]}"
+while [[ -L "${_SRC}" ]]; do
+  _TGT="$(readlink "${_SRC}")"
+  if [[ "${_TGT}" == /* ]]; then
+    _SRC="${_TGT}"
+  else
+    _SRC="$(cd "$(dirname "${_SRC}")" && pwd)/${_TGT}"
+  fi
+done
+SCRIPT_DIR="$(cd "$(dirname "${_SRC}")" && pwd)"
+SOP_DIR="${QIIME2_SOP_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+CONF="${QIIME2_SOP_CONF:-${HOME}/.qiime2-sop.conf}"
+CONDA_SH_DEFAULT="/home/user/anaconda3/etc/profile.d/conda.sh"
+
+# ---- 默认值：先 source 配置文件，再按环境/默认值填充（命令行参数最后覆盖）----
+[[ -f "${CONF}" ]] && source "${CONF}"
+THREADS="${QIIME2_SOP_THREADS:-32}"
+MIN_SAMPLES="${QIIME2_SOP_MIN_SAMPLES:-2}"
+MAX_EE="${QIIME2_SOP_MAX_EE:-2.0}"
+MODE="${QIIME2_SOP_MODE:-paired}"
+PBS_NODES="${QIIME2_SOP_PBS_NODES:-node01:ppn=64}"
+WALLTIME="${QIIME2_SOP_WALLTIME:-48:00:00}"
+CONDA_SH="${QIIME2_SOP_CONDA_SH:-${CONDA_SH_DEFAULT}}"
+OUTPUT_ROOT="${QIIME2_SOP_OUTPUT_ROOT:-}"
+
+FASTQ_DIR=""; REGION=""; CLASSIFIER=""; METADATA=""; PROJECT_DIR=""
+FORWARD_PRIMER=""; REVERSE_PRIMER=""
+SUBMIT=no; DRY=no
+
+usage() {
+  sed -n '3,57p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
+if [[ "${1:-}" == "--init-config" ]]; then
+  if [[ -f "${CONF}" ]]; then
+    echo "配置文件已存在: ${CONF}（未覆盖）"; exit 0
+  fi
+  cat > "${CONF}" <<EOF
+# qiime2-sop 默认配置（命令行参数优先于此文件）
+QIIME2_SOP_THREADS=32
+QIIME2_SOP_MIN_SAMPLES=2
+# 输出根目录习惯：不填则默认放在数据目录旁边
+QIIME2_SOP_OUTPUT_ROOT=/home/user/JAAS
+QIIME2_SOP_PBS_NODES=node01:ppn=64
+QIIME2_SOP_WALLTIME=48:00:00
+QIIME2_SOP_MAX_EE=2.0
+QIIME2_SOP_MODE=paired
+QIIME2_SOP_CONDA_SH=/home/user/anaconda3/etc/profile.d/conda.sh
+EOF
+  echo "已生成配置模板: ${CONF}（按需修改后即可使用）"
+  exit 0
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fastq-dir)        FASTQ_DIR="${2:?missing}"; shift 2 ;;
+    --region)           REGION="${2:?missing}"; shift 2 ;;
+    --classifier)       CLASSIFIER="${2:?missing}"; shift 2 ;;
+    --metadata)         METADATA="${2:?missing}"; shift 2 ;;
+    --project-dir)      PROJECT_DIR="${2:?missing}"; shift 2 ;;
+    --forward-primer)   FORWARD_PRIMER="${2:?missing}"; shift 2 ;;
+    --reverse-primer)   REVERSE_PRIMER="${2:?missing}"; shift 2 ;;
+    --threads)          THREADS="${2:?missing}"; shift 2 ;;
+    --min-samples)      MIN_SAMPLES="${2:?missing}"; shift 2 ;;
+    --max-ee)           MAX_EE="${2:?missing}"; shift 2 ;;
+    --mode)             MODE="${2:?missing}"; shift 2 ;;
+    --pbs-nodes)        PBS_NODES="${2:?missing}"; shift 2 ;;
+    --walltime)         WALLTIME="${2:?missing}"; shift 2 ;;
+    --conda-sh)         CONDA_SH="${2:?missing}"; shift 2 ;;
+    --submit)           SUBMIT=yes; shift ;;
+    --dry-run)          DRY=yes; shift ;;
+    -h|--help)          usage ;;
+    *) echo "未知参数: $1（用 -h 查看帮助）" >&2; usage ;;
+  esac
+done
+
+[[ -n "${FASTQ_DIR}" && -d "${FASTQ_DIR}" ]] || { echo "ERROR: 需要有效的 --fastq-dir" >&2; usage; }
+[[ -n "${CLASSIFIER}" ]] || { echo "ERROR: 需要 --classifier" >&2; usage; }
+[[ -d "${SOP_DIR}" ]] || { echo "ERROR: SOP_DIR 不存在: ${SOP_DIR}" >&2; exit 1; }
+
+# ---- 从 region 解析引物 ----
+if [[ -z "${FORWARD_PRIMER}" && -n "${REGION}" && -f "${SOP_DIR}/primers.tsv" ]]; then
+  norm="$(printf '%s' "${REGION}" | tr '[:lower:]' '[:upper:]' | tr -d ' _-')"
+  row="$(awk -F '\t' -v want="${norm}" '!/^#/ {
+      r=$1; a=$2; gsub(/[ _-]/, "", r); gsub(/[ _-]/, "", a);
+      n=split(a, aliases, ",");
+      if (toupper(r)==want) {print; exit}
+      for (i=1; i<=n; i++) if (toupper(aliases[i])==want) {print; exit}
+    }' "${SOP_DIR}/primers.tsv")"
+  if [[ -n "${row}" ]]; then
+    IFS=$'\t' read -r _rname _ralias r_fwd r_rev _rmin _rmax _rkw _rnotes <<< "${row}"
+    FORWARD_PRIMER="${r_fwd}"
+    REVERSE_PRIMER="${r_rev}"
+    echo "[region] ${REGION} -> F=${FORWARD_PRIMER} R=${REVERSE_PRIMER}"
+  fi
+fi
+[[ -n "${FORWARD_PRIMER}" ]] || { echo "ERROR: 无法解析引物（--region 不在 primers.tsv 或未给 --forward-primer）" >&2; usage; }
+
+# ---- 自动检测引物 -> trim-left ----
+TLF=0; TLR=0
+detect_args=(--dir "${FASTQ_DIR}" --mode "${MODE}" --forward-primer "${FORWARD_PRIMER}" --detect-primers)
+if [[ "${MODE}" == "paired" ]]; then
+  detect_args+=(--reverse-primer "${REVERSE_PRIMER}")
+fi
+detect_out="$(python3 "${SOP_DIR}/bin/estimate_dada2_params.py" "${detect_args[@]}" 2>/dev/null || true)"
+if grep -q "PRIMER_DETECTED_F='yes'" <<< "${detect_out}"; then TLF="${#FORWARD_PRIMER}"; fi
+if [[ "${MODE}" == "paired" ]] && grep -q "PRIMER_DETECTED_R='yes'" <<< "${detect_out}"; then TLR="${#REVERSE_PRIMER}"; fi
+echo "[auto] 引物检测: F=$([ "${TLF}" -gt 0 ] && echo 有 || echo 无) R=$([ "${TLR}" -gt 0 ] && echo 有 || echo 无) -> trim-left ${TLF}/${TLR}"
+
+# ---- 默认输出目录（配置 OUTPUT_ROOT 优先，其次数据目录旁）----
+if [[ -z "${PROJECT_DIR}" ]]; then
+  if [[ -n "${OUTPUT_ROOT}" ]]; then
+    PROJECT_DIR="${OUTPUT_ROOT%/}/$(basename "${FASTQ_DIR}")_qiime2_out"
+  else
+    PROJECT_DIR="$(cd "$(dirname "${FASTQ_DIR}")" && pwd)/$(basename "${FASTQ_DIR}")_qiime2_out"
+  fi
+fi
+
+# ---- 组装 run_all 命令 ----
+run_args=(--fastq-dir "${FASTQ_DIR}"
+  --region "${REGION}" --classifier "${CLASSIFIER}"
+  --conda-sh "${CONDA_SH}" --project-dir "${PROJECT_DIR}"
+  --threads "${THREADS}" --mode "${MODE}"
+  --auto-primer-trim no --auto-trunc yes
+  --trim-left-f "${TLF}" --trim-left-r "${TLR}"
+  --max-ee "${MAX_EE}")
+[[ -n "${METADATA}" ]] && run_args+=(--metadata "${METADATA}")
+# 0 或空 = 不过滤；正整数才传给 run_all
+if [[ -n "${MIN_SAMPLES}" && "${MIN_SAMPLES}" != "0" ]]; then
+  run_args+=(--min-samples "${MIN_SAMPLES}")
+fi
+
+run_all=(bash "${SOP_DIR}/run_all.sh" "${run_args[@]}")
+
+if [[ "${DRY}" == "yes" ]]; then
+  echo "--- 将执行的命令 ---"
+  printf '%q ' "${run_all[@]}"; echo
+  exit 0
+fi
+
+if [[ "${SUBMIT}" != "yes" ]]; then
+  echo ">>> 前台运行 run_all.sh（输出目录: ${PROJECT_DIR}）"
+  exec "${run_all[@]}"
+fi
+
+# ---- 生成 PBS 并提交 ----
+mkdir -p "${PROJECT_DIR}"
+PBS="${PROJECT_DIR}/qiime2-sop.pbs"
+JOBNAME="qiime2_$(basename "${PROJECT_DIR}" | tr -cd 'A-Za-z0-9_' | cut -c1-15)"
+{
+  echo '#!/bin/bash'
+  echo "#PBS -N ${JOBNAME}"
+  echo "#PBS -l nodes=${PBS_NODES}"
+  echo "#PBS -l walltime=${WALLTIME}"
+  echo '#PBS -j oe'
+  echo '# 由 qiime2-sop 自动生成'
+  echo 'set -euo pipefail'
+  echo "PIPE_DIR=${SOP_DIR}"
+  echo "OUT_DIR=${PROJECT_DIR}"
+  echo 'cd "${PIPE_DIR}"'
+  echo 'rm -f "${OUT_DIR}"/work/demux-for-dada2.qza "${OUT_DIR}"/work/primers.env "${OUT_DIR}"/work/primers.detect.env "${OUT_DIR}"/work/dada2_auto.env'
+  echo 'rm -rf "${OUT_DIR}"/work/demux_dada2_export "${OUT_DIR}"/results/dada2'
+  printf 'bash %q ' "${SOP_DIR}/run_all.sh"; printf '%q ' "${run_args[@]}"; echo
+} > "${PBS}"
+echo ">>> PBS 已生成: ${PBS}"
+echo ">>> 提交: qsub ${PBS}"
+qsub "${PBS}"

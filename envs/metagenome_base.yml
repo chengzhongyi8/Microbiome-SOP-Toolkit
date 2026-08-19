@@ -1,0 +1,24 @@
+# Core assembly / gene-catalog / quantification / taxonomy environment
+# (metagenome workflow, modules 02-05 and parts of 07/08).
+#
+# Megahit + seqkit + Prodigal + CD-HIT + MMseqs2 + Salmon + BWA + SAMtools +
+# DIAMOND (+ python for the bundled helper scripts, which use stdlib only).
+# Used by: ENV_ASSEMBLY, ENV_GENE, ENV_CLUSTER_MMSEQS, ENV_CLUSTER_CDHIT,
+#          ENV_SALMON, ENV_BWA, ENV_DIAMOND, ENV_MEGAN, ENV_KRAKEN2,
+#          ENV_MAG_PRODIGAL
+name: metagenome_base
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.8
+  - megahit>=1.2.9
+  - seqkit>=2.5.0
+  - prodigal>=2.6.3
+  - cd-hit>=4.8.1
+  - mmseqs2>=15.3
+  - salmon>=1.10
+  - bwa>=0.7.17
+  - samtools>=1.17
+  - diamond>=2.1
+  - fastani>=1.33

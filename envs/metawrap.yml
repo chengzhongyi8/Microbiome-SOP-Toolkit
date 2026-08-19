@@ -1,0 +1,22 @@
+# MetaWRAP environment (metagenome workflow, module 07 binning).
+#
+# The binners (MetaBAT2, MaxBin2, CONCOCT) and their helper scripts
+# (jgi_summarize_bam_contig_depths, cut_up_fasta.py, ...) are provided by the
+# metawrap package.  bowtie2/samtools are listed explicitly because module 07
+# runs them directly from this environment.
+#
+# NOTE: the bioconda `metawrap` recipe can lag behind the upstream release.
+# If the conda install fails or is too old, install MetaWRAP from its GitHub
+# repo into this environment instead (https://github.com/bxlab/metaWRAP).
+# Used by: ENV_METAWRAP
+name: metawrap
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - metawrap>=1.2
+  - metabat2
+  - maxbin2
+  - concoct
+  - bowtie2>=2.5
+  - samtools>=1.17

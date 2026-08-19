@@ -1,0 +1,4 @@
+sample_id	group	metag_r1	metag_r2	metat_r1	metat_r2
+Sample1	GroupA	/path/to/Sample1_R1.fastq.gz	/path/to/Sample1_R2.fastq.gz		
+Sample2	GroupA	/path/to/Sample2_R1.fastq.gz	/path/to/Sample2_R2.fastq.gz		
+

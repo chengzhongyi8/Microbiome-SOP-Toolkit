@@ -1,0 +1,117 @@
+# ============================================================================
+# Shotgun metagenome workflow — example configuration
+#
+# Copy to your project (e.g. `microbiome-toolkit init-config metagenome`) and
+# edit.  Run with:
+#   microbiome-toolkit metagenome --config metagenome_config.yaml
+#   # or: bash bin/run_metagenome.sh --config metagenome_config.yaml
+#
+# CLI flags override every value below.  Unknown keys are ignored with a
+# warning.  The full parameter reference is in docs/PARAMETERS.md.
+#
+# NOTE ON DATABASES: paths to large reference databases (NR, eggNOG, CheckM2,
+# GTDB, KofamScan, MEGAN map) are intentionally NOT shipped with this file.
+# Set them here (or via CLI) before enabling the corresponding modules.
+# ============================================================================
+
+# --- input / output -----------------------------------------------------------
+project_dir: /path/to/metagenome_project   # output root (results/ work/ logs/)
+input: /path/to/fastq                      # reads dir (*_1.fq.gz / *_2.fq.gz)
+group_file: ""                             # optional: sample_id<TAB>group (co-assembly per group)
+
+# --- QC / host removal ----------------------------------------------------------
+qc_needed: yes                 # yes = kneaddata QC + host removal; no = clean data only
+host_genome: ""                # bowtie2 index prefix of the host genome
+host_fasta: ""                 # or host genome FASTA (auto bowtie2-build into host_db_dir)
+host_name: ""                  # species dir name for the auto-built index
+host_db_dir: /path/to/databases/host_db
+adapters: ""                   # trimmomatic adapter file (ILLUMINACLIP), optional
+trimmomatic_opts: "SLIDINGWINDOW:4:20 MINLEN:50"
+
+# --- assembly (MEGAHIT) ---------------------------------------------------------
+assembly: per-sample           # per-sample | co-assembly | both
+min_contig_len: 1000           # gene prediction: contigs >= N bp
+bin_min_contig_len: 1500       # binning: contigs >= N bp
+
+# --- gene catalog ----------------------------------------------------------------
+cluster: mmseqs2               # mmseqs2 | cd-hit-est
+gene:
+  identity: 0.95
+  coverage: 0.90
+
+# --- quantification ---------------------------------------------------------------
+quant: salmon                  # salmon | bwa
+contig_coverage: no            # extra contig depth table (extra alignment; off by default)
+
+# --- taxonomy (DIAMOND vs NR + MEGAN) ----------------------------------------------
+taxonomy: nr-megan             # nr-megan | kraken2 | none
+nr_db: /path/to/nr.dmnd                # DIAMOND NR database (required for nr-megan)
+megan_map: /path/to/prot_acc2tax.abin  # MEGAN accession->taxid mapping (required)
+max_target_seqs: 10
+taxa_filter: all               # all | bacteria
+kraken2_db: /path/to/kraken2_db        # only if taxonomy: kraken2
+
+# --- function (eggNOG-mapper) --------------------------------------------------------
+function: eggnog                # eggnog | none
+eggnog_db: /path/to/eggnog_data_dir    # eggNOG database directory (required for eggnog)
+eggnog_shm: no                 # yes = copy DB into /dev/shm (needs space)
+eggnog:
+  prot_min_len: 150
+kegg:
+  module_def: ""               # optional: KEGG module.ko
+  module_name: ""              # optional: KEGG module names file
+  pathway_def: ""              # optional: KEGG ko00001.keg
+  complete_threshold: 0.9
+
+# --- MAG binning (MetaWRAP + dRep + CheckM2) ----------------------------------------
+binning: none                  # metawrap | none
+binners: metabat2,maxbin2,concoct
+binning_refine: yes
+binning_reassemble: no
+run_drep: yes
+drep_ignore_quality: no        # yes = skip checkm filter in dRep (CheckM2 evaluates quality)
+mag_filter: no                 # yes = keep MAGs passing the thresholds below
+mag_min_completeness: 50
+mag_max_contamination: 10
+checkm2_db: /path/to/checkm2_db
+
+# --- MAG downstream annotation (module 08) --------------------------------------------
+mag_annotate: no               # yes = GTDB-Tk + Prodigal + KofamScan
+mag_quant: no                  # yes = coverM MAG abundance
+mag_quant_methods: ""          # extra coverM methods, e.g. "rpkm tpm"
+gtdbtk_db: /path/to/gtdbtk_data          # GTDB reference database (required for annotate)
+gtdbtk_pplacer_cpus: 1
+kofam_profile: /path/to/kofamscan/profiles
+kofam_ko_list: /path/to/kofamscan/ko_list
+
+# --- conda --------------------------------------------------------------------------
+conda:
+  conda_sh: /path/to/anaconda3/etc/profile.d/conda.sh   # server: conda info --base
+  conda_module: ""
+  qc_env: metagenome_qc
+  assembly_env: metagenome_base
+  gene_env: metagenome_base
+  mmseqs_env: metagenome_base
+  cdhit_env: metagenome_base
+  salmon_env: metagenome_base
+  bwa_env: metagenome_base
+  diamond_env: metagenome_base
+  megan_env: metagenome_base
+  kraken2_env: metagenome_base
+  eggnog_env: metagenome_eggnog
+  metawrap_env: metawrap
+  checkm2_env: checkm2
+  drep_env: drep
+  gtdbtk_env: gtdbtk
+  coverm_env: mag_annotation
+  kofam_env: mag_annotation
+
+# --- resources ----------------------------------------------------------------------
+resources:
+  threads: 16                  # CPUs per task
+  jobs: 4                      # parallel tasks (threads*jobs <= node cores)
+  memory_gb: 64
+
+# --- runtime ------------------------------------------------------------------------
+runtime:
+  resume: yes

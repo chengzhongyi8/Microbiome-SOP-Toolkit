@@ -1,0 +1,15 @@
+# eggNOG-mapper environment (metagenome workflow, module 06).
+#
+# emapper.py needs its own environment because it pins specific python /
+# search-tool versions that may conflict with metagenome_base.
+# Used by: ENV_EGGNOG
+name: metagenome_eggnog
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.8
+  - eggnog-mapper>=2.1.9
+  - diamond>=2.1
+  - mmseqs2>=15.3
+  - biopython

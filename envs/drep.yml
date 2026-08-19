@@ -1,0 +1,15 @@
+# dRep environment (metagenome workflow, module 07 dereplication).
+#
+# dRep uses fastANI for ANI clustering and checkm for its optional quality
+# filter (skip the filter with --drep-ignore-quality yes; CheckM2 evaluates
+# quality downstream anyway).
+# Used by: ENV_DREP
+name: drep
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - drep>=3.4
+  - fastani>=1.33
+  - checkm-genome>=1.2
+  - mash>=2.3

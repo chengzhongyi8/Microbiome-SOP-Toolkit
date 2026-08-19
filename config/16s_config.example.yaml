@@ -1,0 +1,79 @@
+# ============================================================================
+# 16S amplicon workflow — example configuration
+#
+# Copy to your project (e.g. `microbiome-toolkit init-config 16s`) and edit.
+# Run with:
+#   microbiome-toolkit 16s --config 16s_config.yaml
+#   # or: bash bin/run_16s.sh --config 16s_config.yaml
+#
+# CLI flags override every value below.  Unknown keys are ignored with a
+# warning.  The full parameter reference is in docs/PARAMETERS.md.
+# ============================================================================
+
+# --- input / output -----------------------------------------------------------
+input: /path/to/fastq                 # FASTQ dir (top level, *_R1.fastq.gz / *_R2.fastq.gz)
+output: /path/to/qiime2_project       # project/output dir (absolute path)
+metadata: /path/to/metadata.tsv       # optional; first column #SampleID.
+                                      # Empty/omitted -> minimal metadata is auto-generated.
+region: 16S_V4                        # amplification region; see workflows/16s/primers.tsv
+                                      # (16S_V4, 16S_V3V4, 16S_V4V5, 16S_V5V7, 16S_V1V2,
+                                      #  16S_full, ITS1, ITS2, 18S_V4, COI ...)
+mode: paired                          # paired | single
+forward_primer: ""                    # optional; overrides region default (IUPAC ok)
+reverse_primer: ""                    # optional; overrides region default (IUPAC ok)
+
+# --- classifier ---------------------------------------------------------------
+classifier: /path/to/silva-138-99-515-806-nb-classifier.qza
+classifier_dir: ""                    # alternative: dir to auto-discover a classifier
+
+# --- DADA2 denoising -----------------------------------------------------------
+auto_trunc: yes                       # estimate trim/trunc from quality profile
+quality_threshold: 20                 # mean-Q cutoff used by the auto estimator
+min_trunc_len: 50
+max_ee: 2.0
+dada2:
+  trim_left_f: ""                     # manual overrides (win over auto estimates)
+  trim_left_r: ""
+  trunc_len_f: ""
+  trunc_len_r: ""
+min_samples: ""                       # prevalence filter: keep ASVs in >= N samples (empty = none)
+
+# --- primer trimming -----------------------------------------------------------
+run_cutadapt: no                      # yes: always run cutadapt
+auto_primer_trim: yes                 # auto-detect primers at read starts and trim if found
+cutadapt:
+  error_rate: 0.1
+  minimum_length: 1
+
+# --- taxonomy filtering --------------------------------------------------------
+filtering:
+  target_domain: Bacteria             # Bacteria, Archaea, Eukaryota, or empty
+  exclude_mitochondria: yes
+  exclude_chloroplast: yes
+  exclude_archaea: no
+  exclude_eukaryota: yes
+  exclude_unassigned: no
+
+# --- optional downstream (diversity) -------------------------------------------
+optional:
+  run_core_metrics: no
+  sampling_depth: ""                  # required if run_core_metrics: yes
+  run_alpha_rarefaction: no
+  alpha_max_depth: ""
+  run_taxa_barplot: no
+  run_file2meco_validation: auto      # yes | no | auto (only if the R env exists)
+
+# --- conda ----------------------------------------------------------------------
+conda:
+  conda_sh: /path/to/anaconda3/etc/profile.d/conda.sh   # server: conda info --base
+  conda_module: ""                    # e.g. miniconda; only if confirmed on the cluster
+  qiime2_env: qiime2                  # created from envs/16s.yml
+  microeco_env: microeco              # created from envs/microeco.yml
+
+# --- runtime --------------------------------------------------------------------
+runtime:
+  resume: yes
+  check_gzip_integrity: no            # yes = gzip -t every FASTQ (slow on big data)
+  count_reads: yes
+
+threads: 16                           # cutadapt / DADA2 / classifier / phylogeny threads

@@ -1,0 +1,5 @@
+reference_name	fasta	reference_type
+gene_catalog	/path/to/gene_catalog.fna	contig
+votu	/path/to/vOTU.fna	contig
+amg	/path/to/accepted_AMG.fna	contig
+

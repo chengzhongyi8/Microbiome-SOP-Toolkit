@@ -1,0 +1,15 @@
+# GTDB-Tk environment (metagenome workflow, module 08 MAG taxonomy).
+#
+# GTDB-Tk bundles pplacer/fastani/mash.  After creating the environment you
+# must download the GTDB reference database and point GTDBTK_DATA_PATH at it
+# (see docs/DATABASES.md).
+# Used by: ENV_GTDBTK
+name: gtdbtk
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - gtdbtk>=2.4.1
+  - pplacer
+  - fastani>=1.33
+  - mash>=2.3

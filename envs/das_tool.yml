@@ -1,0 +1,15 @@
+# DAS_Tool environment (metagenome workflow, module 07 bin refinement).
+#
+# DAS_Tool integrates multiple binners (MetaBAT2/MaxBin2/CONCOCT) and needs
+# its own R + diamond setup, so it lives in a dedicated environment.
+# Used by: the DAS_Tool invocation inside module 07 (config: DAS_TOOL)
+name: das_tool
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - das_tool>=1.1.6
+  - r-base
+  - r-docopt
+  - diamond>=2.1
+  - prodigal>=2.6

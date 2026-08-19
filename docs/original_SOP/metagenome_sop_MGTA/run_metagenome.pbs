@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -N metagenome_sop
+#PBS -l nodes=node01:ppn=64
+#PBS -l walltime=168:00:00
+#PBS -j oe
+# 输出默认放在提交目录（metagenome_sop.o<作业ID>）；真正的流程日志在 <project>/logs/pipeline.log
+
+# ============================================================================
+# 宏基因组分析 SOP — PBS 提交模板（照 QIIME2 SOP 的提交方式）
+#
+# 用法:
+#   1) 按项目修改下面的 PIPE_DIR / PROJECT_DIR / FASTQ_DIR 和各参数；
+#   2) qsub run_metagenome.pbs
+#
+# 说明:
+#   - --qc-needed yes : 公司未质控，kneaddata 质控+去宿主；
+#                       no  : 公司已给 clean data，只去宿主。
+#   - --host-genome    : 宿主 bowtie2 索引前缀；没有索引时用 --host-fasta 自动建。
+#   - --adapters       : trimmomatic 接头文件（先 grep 确认用哪个，参考你的经验）。
+#   - --assembly       : per-sample | co-assembly | both（给 --group-file 可按组共组装）。
+#   - --binning        : metawrap 或 none；质量检测用 CheckM2。
+#   - --threads*--jobs 不要超过节点总核数（ppn）。
+# ============================================================================
+
+set -euo pipefail
+
+PIPE_DIR=/home/user/toolkit/metagenome_sop
+PROJECT_DIR=/home/user/proj/xxx_mg        # 改成你的项目目录
+FASTQ_DIR=/home/user/proj/xxx_mg/seq      # 改成你的测序数据目录
+# GROUP_FILE=/home/user/proj/xxx_mg/groups.tsv   # 可选：共组装按分组
+
+cd "${PIPE_DIR}"
+
+bash run_mg_sop.sh \
+  --project-dir   "${PROJECT_DIR}" \
+  --fastq-dir     "${FASTQ_DIR}" \
+  --qc-needed     yes \
+  --host-genome   /home/user/database/host_db/wheat/wheat \
+  --adapters      /home/user/anaconda3/share/trimmomatic-0.39-2/adapters/TruSeq3-PE-2.fa \
+  --assembly      co-assembly \
+  --cluster       mmseqs2 \
+  --quant         salmon \
+  --taxonomy      nr-megan \
+  --function      eggnog \
+  --binning       none \
+  --threads       28 \
+  --jobs          8 \
+  --memory-gb     128
+# 若启用 binning（MetaWRAP）:
+#   --binning metawrap --binners metabat2,maxbin2,concoct --run-drep yes

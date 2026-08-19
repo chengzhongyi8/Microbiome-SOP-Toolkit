@@ -1,0 +1,3 @@
+sample_id	group	metag_r1	metag_r2	metat_r1	metat_r2
+Sample1	Control	/path/to/fastq/Sample1_1.fq.gz	/path/to/fastq/Sample1_2.fq.gz	/path/to/metaT/Sample1_1.fq.gz	/path/to/metaT/Sample1_2.fq.gz
+Sample2	Treatment	/path/to/fastq/Sample2_1.fq.gz	/path/to/fastq/Sample2_2.fq.gz	/path/to/metaT/Sample2_1.fq.gz	/path/to/metaT/Sample2_2.fq.gz

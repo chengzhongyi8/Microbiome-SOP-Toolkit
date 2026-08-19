@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# qiime2-sop: one-command wrapper for the 16S amplicon workflow.
+#
+# Thin wrapper around bin/run_16s.sh that adds:
+#   --submit / --pbs-nodes / --pbs-mem / --walltime   generate a PBS script
+#                                                     and qsub it on a cluster
+#   --dry-run          print the command that would run, do not execute
+#   --init-config      write a personal defaults file (~/.qiime2-sop.conf)
+#                      with your usual cluster/thread settings
+#
+# Usage:
+#   qiime2-sop --input DIR --region REGION --classifier CLS.qza [options]
+#   qiime2-sop --input DIR --config config/16s_config.yaml --submit
+#
+# Required:
+#   --input DIR         FASTQ directory (top level, *_R1.fastq.gz / *_R2.fastq.gz)
+#   --classifier PATH   taxonomy classifier .qza
+#   (or --region REGION to resolve primers; a classifier is always required)
+#
+# Optional (same as run_16s.sh, see its --help):
+#   --output DIR, --metadata FILE, --region NAME, --forward-primer SEQ,
+#   --reverse-primer SEQ, --threads N, --min-samples N, --max-ee N,
+#   --mode paired|single, --conda-sh PATH, --qiime2-env NAME,
+#   --microeco-env NAME, --resume yes|no, --force, --config FILE.yaml ...
+#
+# Personal defaults file ~/.qiime2-sop.conf (CLI flags win):
+#   QIIME2_SOP_THREADS=16
+#   QIIME2_SOP_OUTPUT_ROOT=/path/to/results    # default output root
+#   QIIME2_SOP_PBS_NODES=1:ppn=32
+#   QIIME2_SOP_WALLTIME=48:00:00
+#   QIIME2_SOP_MODE=paired
+#   QIIME2_SOP_CONDA_SH=/path/to/conda.sh
+set -euo pipefail
+
+# resolve real location through symlinks
+_SRC="${BASH_SOURCE[0]}"
+while [[ -L "${_SRC}" ]]; do
+  _TGT="$(readlink "${_SRC}")"
+  if [[ "${_TGT}" == /* ]]; then _SRC="${_TGT}"
+  else _SRC="$(cd "$(dirname "${_SRC}")" && pwd)/${_TGT}"; fi
+done
+SCRIPT_DIR="$(cd "$(dirname "${_SRC}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKFLOW_DIR="${ROOT_DIR}/workflows/16s"
+CONF="${QIIME2_SOP_CONF:-${HOME}/.qiime2-sop.conf}"
+
+[[ -f "${CONF}" ]] && source "${CONF}"
+THREADS="${QIIME2_SOP_THREADS:-}"
+OUTPUT_ROOT="${QIIME2_SOP_OUTPUT_ROOT:-}"
+PBS_NODES="${QIIME2_SOP_PBS_NODES:-1:ppn=32}"
+PBS_MEM="${QIIME2_SOP_PBS_MEM:-}"
+WALLTIME="${QIIME2_SOP_WALLTIME:-48:00:00}"
+CONDA_SH="${QIIME2_SOP_CONDA_SH:-}"
+MODE="${QIIME2_SOP_MODE:-paired}"
+
+INPUT=""; REGION=""; CLASSIFIER=""; METADATA=""; PROJECT_DIR=""
+FORWARD_PRIMER=""; REVERSE_PRIMER=""; CONFIG_FILE=""
+SUBMIT=no; DRY=no; SEEN_THREADS=no; SEEN_CONDA=no; SEEN_PROJECT=no
+run_args=()
+
+usage() {
+  sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
+if [[ "${1:-}" == "--init-config" ]]; then
+  if [[ -f "${CONF}" ]]; then echo "Config file already exists: ${CONF} (not overwritten)"; exit 0; fi
+  cat > "${CONF}" <<CONFEOF
+# qiime2-sop personal defaults (CLI flags override these)
+QIIME2_SOP_THREADS=16
+# default output root: leave empty to place results next to the data dir
+QIIME2_SOP_OUTPUT_ROOT=
+QIIME2_SOP_PBS_NODES=1:ppn=32
+QIIME2_SOP_PBS_MEM=
+QIIME2_SOP_WALLTIME=48:00:00
+QIIME2_SOP_MODE=paired
+QIIME2_SOP_CONDA_SH=
+CONFEOF
+  echo "Wrote config template: ${CONF} (edit and re-run)"
+  exit 0
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --submit)         SUBMIT=yes; shift ;;
+    --dry-run)        DRY=yes; shift ;;
+    --pbs-nodes)      PBS_NODES="${2:?missing --pbs-nodes}"; shift 2 ;;
+    --pbs-mem)        PBS_MEM="${2:?missing --pbs-mem}"; shift 2 ;;
+    --walltime)       WALLTIME="${2:?missing --walltime}"; shift 2 ;;
+    --input)          INPUT="${2:?missing --input}"; run_args+=(--input "$2"); shift 2 ;;
+    --output)         PROJECT_DIR="${2:?missing --output}"; SEEN_PROJECT=yes; run_args+=(--output "$2"); shift 2 ;;
+    --project-dir)    PROJECT_DIR="${2:?missing --project-dir}"; SEEN_PROJECT=yes; run_args+=(--project-dir "$2"); shift 2 ;;
+    --region)         REGION="${2:?missing --region}"; run_args+=(--region "$2"); shift 2 ;;
+    --classifier)     CLASSIFIER="${2:?missing --classifier}"; run_args+=(--classifier "$2"); shift 2 ;;
+    --metadata)       METADATA="${2:?missing --metadata}"; run_args+=(--metadata "$2"); shift 2 ;;
+    --forward-primer) FORWARD_PRIMER="${2:?missing --forward-primer}"; run_args+=(--forward-primer "$2"); shift 2 ;;
+    --reverse-primer) REVERSE_PRIMER="${2:?missing --reverse-primer}"; run_args+=(--reverse-primer "$2"); shift 2 ;;
+    --threads)        SEEN_THREADS=yes; run_args+=(--threads "$2"); shift 2 ;;
+    --conda-sh)       SEEN_CONDA=yes; run_args+=(--conda-sh "$2"); shift 2 ;;
+    --mode)           MODE="${2:?missing --mode}"; run_args+=(--mode "$2"); shift 2 ;;
+    --config)         CONFIG_FILE="${2:?missing --config}"; run_args+=(--config "$2"); shift 2 ;;
+    --force|--no-init|--init-only) run_args+=("$1"); shift ;;
+    -h|--help)        usage ;;
+    --*)              run_args+=("$1" "${2:?missing value for $1}"); shift 2 ;;
+    *) echo "unknown argument: $1 (use -h for help)" >&2; usage ;;
+  esac
+done
+
+[[ -n "${INPUT}" && -d "${INPUT}" ]] || { echo "ERROR: need a valid --input FASTQ directory" >&2; usage; }
+[[ -n "${CLASSIFIER}" || -n "${CONFIG_FILE}" ]] || { echo "ERROR: need --classifier (or a --config file that sets classifier)" >&2; usage; }
+
+# inject defaults from the personal config file when not given on the CLI
+[[ "${SEEN_THREADS}" == "no" && -n "${THREADS}" ]] && run_args+=(--threads "${THREADS}")
+[[ "${SEEN_CONDA}" == "no" && -n "${CONDA_SH}" ]] && run_args+=(--conda-sh "${CONDA_SH}")
+
+# default output directory: next to the data directory
+if [[ "${SEEN_PROJECT}" == "no" ]]; then
+  if [[ -n "${OUTPUT_ROOT}" ]]; then
+    PROJECT_DIR="${OUTPUT_ROOT%/}/$(basename "${INPUT}")_qiime2_out"
+  else
+    PROJECT_DIR="$(cd "$(dirname "${INPUT}")" && pwd)/$(basename "${INPUT}")_qiime2_out"
+  fi
+  run_args+=(--output "${PROJECT_DIR}")
+fi
+
+cmd=(bash "${SCRIPT_DIR}/run_16s.sh" "${run_args[@]}")
+
+if [[ "${DRY}" == "yes" && "${SUBMIT}" != "yes" ]]; then
+  echo "--- command that would run ---"
+  printf '%q ' "${cmd[@]}"; echo
+  exit 0
+fi
+
+if [[ "${SUBMIT}" != "yes" ]]; then
+  echo ">>> running run_16s.sh in the foreground (output dir: ${PROJECT_DIR})"
+  exec "${cmd[@]}"
+fi
+
+# ---- generate PBS script and submit -----------------------------------------
+mkdir -p "${PROJECT_DIR}"
+PBS="${PROJECT_DIR}/qiime2-sop.pbs"
+JOBNAME="qiime2_$(basename "${PROJECT_DIR}" | tr -cd 'A-Za-z0-9_' | cut -c1-15)"
+{
+  echo '#!/bin/bash'
+  echo "#PBS -N ${JOBNAME}"
+  echo "#PBS -l nodes=${PBS_NODES}"
+  [[ -n "${PBS_MEM}" ]] && echo "#PBS -l mem=${PBS_MEM}"
+  echo "#PBS -l walltime=${WALLTIME}"
+  echo '#PBS -j oe'
+  echo '# generated by qiime2-sop'
+  echo 'set -euo pipefail'
+  printf 'bash %q ' "${SCRIPT_DIR}/run_16s.sh"; printf '%q ' "${run_args[@]}"; echo
+} > "${PBS}"
+
+if [[ "${DRY}" == "yes" ]]; then
+  echo "--- PBS script (${PBS}) ---"
+  cat "${PBS}"
+  exit 0
+fi
+
+echo ">>> PBS script written: ${PBS}"
+echo ">>> submitting: qsub ${PBS}"
+qsub "${PBS}"

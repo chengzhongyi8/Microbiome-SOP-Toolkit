@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# mg-sop: 一键运行宏基因组分析 SOP（同 qiime2-sop 的使用方式）。
+#
+# 用法:
+#   mg-sop --fastq-dir DIR --host-genome PREFIX [选项]
+#
+# 必选参数（与 run_mg_sop.sh 一致）:
+#   --fastq-dir DIR        测序数据目录（*_1.fq.gz / *_2.fq.gz，也支持 .R1.fq 等）
+#   --project-dir DIR      输出目录（不填则默认 FASTQ_DIR 旁边的 <目录名>_mg_out）
+#
+# 常用参数:
+#   --qc-needed yes|no     公司没质控=yes；已质控=no(只去宿主)          [默认 yes]
+#   --host-genome PREFIX   宿主 bowtie2 索引前缀
+#   --host-fasta FILE      宿主基因组 FASTA（第一次自动建索引，>4GB 自动 --large-index）
+#   --host-name NAME       自动建索引的物种目录名
+#   --assembly MODE        per-sample | co-assembly | both             [默认 per-sample]
+#   --cluster / --quant / --taxonomy / --function / --binning ...      同 run_mg_sop.sh
+#   --group-file FILE      可选分组文件（共组装按组）
+#   --contig-coverage yes|no  额外输出 contig 覆盖深度表（reads 回比组装）[默认 no]
+#   --kegg-module-def FILE    可选 KEGG module.ko（完整度；空=只出检测表）
+#   --kegg-pathway-def FILE   可选 KEGG ko00001.keg（完整度；空=只出检测表）
+#   --threads N / --jobs N / --memory-gb N
+#   --conda-sh PATH
+#
+# 提交方式:
+#   --submit              生成 PBS 并 qsub 提交到集群（不加则前台直接运行）
+#   --pbs-nodes S         PBS 节点，默认 node01:ppn=64；不能指定节点写 1:ppn=64
+#   --pbs-mem MEM         可选，例如 256gb（会加 #PBS -l mem=...）
+#   --walltime HH:MM:SS   PBS 时长，默认 168:00:00
+#   --dry-run             只打印将要执行的命令（配合 --submit 打印 PBS 内容），不运行
+#   --init-config         生成配置文件模板 ~/.mg-sop.conf（若不存在）后退出
+#
+# 配置文件 ~/.mg-sop.conf（可选，命令行参数优先）:
+#   MG_SOP_THREADS=28
+#   MG_SOP_OUTPUT_ROOT=/home/user/proj
+#   MG_SOP_PBS_NODES=node01:ppn=64
+#   MG_SOP_PBS_MEM=
+#   MG_SOP_WALLTIME=168:00:00
+#   MG_SOP_CONDA_SH=/home/user/anaconda3/etc/profile.d/conda.sh
+set -euo pipefail
+
+# 解析软链，确保通过软链调用时也能找到真实流水线目录
+_SRC="${BASH_SOURCE[0]}"
+while [[ -L "${_SRC}" ]]; do
+  _TGT="$(readlink "${_SRC}")"
+  if [[ "${_TGT}" == /* ]]; then _SRC="${_TGT}"
+  else _SRC="$(cd "$(dirname "${_SRC}")" && pwd)/${_TGT}"; fi
+done
+SCRIPT_DIR="$(cd "$(dirname "${_SRC}")" && pwd)"
+SOP_DIR="${MG_SOP_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+CONF="${MG_SOP_CONF:-${HOME}/.mg-sop.conf}"
+
+[[ -f "${CONF}" ]] && source "${CONF}"
+THREADS="${MG_SOP_THREADS:-}"
+OUTPUT_ROOT="${MG_SOP_OUTPUT_ROOT:-}"
+PBS_NODES="${MG_SOP_PBS_NODES:-node01:ppn=64}"
+PBS_MEM="${MG_SOP_PBS_MEM:-}"
+WALLTIME="${MG_SOP_WALLTIME:-168:00:00}"
+CONDA_SH="${MG_SOP_CONDA_SH:-}"
+
+SUBMIT=no; DRY=no; FASTQ_DIR=""; PROJECT_DIR=""; SEEN_THREADS=no; SEEN_CONDA=no; SEEN_PROJECT=no
+run_args=()
+
+usage() {
+  # 只打印文件顶部的注释帮助块，遇到第一行代码就停止
+  awk 'NR>=2 && /^#/ { sub(/^# ?/, ""); print; next } NR>=2 && !/^#/ { exit }' "${BASH_SOURCE[0]}"
+  exit 0
+}
+
+if [[ "${1:-}" == "--init-config" ]]; then
+  if [[ -f "${CONF}" ]]; then echo "配置文件已存在: ${CONF}（未覆盖）"; exit 0; fi
+  cat > "${CONF}" <<'CONFEOF'
+# mg-sop 默认配置（命令行参数优先于此文件）
+MG_SOP_THREADS=28
+# 输出根目录：不填则默认放在数据目录旁边
+MG_SOP_OUTPUT_ROOT=/home/user/proj
+MG_SOP_PBS_NODES=node01:ppn=64
+MG_SOP_PBS_MEM=
+MG_SOP_WALLTIME=168:00:00
+MG_SOP_CONDA_SH=/home/user/anaconda3/etc/profile.d/conda.sh
+CONFEOF
+  echo "已生成配置模板: ${CONF}（按需修改后即可使用）"; exit 0
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --submit)         SUBMIT=yes; shift ;;
+    --dry-run)        DRY=yes; shift ;;
+    --pbs-nodes)      PBS_NODES="${2:?missing --pbs-nodes}"; shift 2 ;;
+    --pbs-mem)        PBS_MEM="${2:?missing --pbs-mem}"; shift 2 ;;
+    --walltime)       WALLTIME="${2:?missing --walltime}"; shift 2 ;;
+    --fastq-dir)      FASTQ_DIR="${2:?missing --fastq-dir}"; run_args+=(--fastq-dir "$2"); shift 2 ;;
+    --project-dir)    PROJECT_DIR="${2:?missing --project-dir}"; SEEN_PROJECT=yes; run_args+=(--project-dir "$2"); shift 2 ;;
+    --threads)        SEEN_THREADS=yes; run_args+=(--threads "$2"); shift 2 ;;
+    --conda-sh)       SEEN_CONDA=yes; run_args+=(--conda-sh "$2"); shift 2 ;;
+    -h|--help)        usage ;;
+    --force|--check-only) run_args+=("$1"); shift ;;
+    --*)              run_args+=("$1" "${2:?missing value for $1}"); shift 2 ;;
+    *) echo "未知参数: $1（用 -h 查看帮助）" >&2; usage ;;
+  esac
+done
+
+[[ -n "${FASTQ_DIR}" && -d "${FASTQ_DIR}" ]] || { echo "ERROR: 需要有效的 --fastq-dir" >&2; usage; }
+[[ -d "${SOP_DIR}" ]] || { echo "ERROR: SOP_DIR 不存在: ${SOP_DIR}" >&2; exit 1; }
+
+# 默认值注入（命令行没给、配置里有时）
+[[ "${SEEN_THREADS}" == "no" && -n "${THREADS}" ]] && run_args+=(--threads "${THREADS}")
+[[ "${SEEN_CONDA}" == "no" && -n "${CONDA_SH}" ]] && run_args+=(--conda-sh "${CONDA_SH}")
+
+# 默认输出目录
+if [[ "${SEEN_PROJECT}" == "no" ]]; then
+  if [[ -n "${OUTPUT_ROOT}" ]]; then
+    PROJECT_DIR="${OUTPUT_ROOT%/}/$(basename "${FASTQ_DIR}")_mg_out"
+  else
+    PROJECT_DIR="$(cd "$(dirname "${FASTQ_DIR}")" && pwd)/$(basename "${FASTQ_DIR}")_mg_out"
+  fi
+  run_args+=(--project-dir "${PROJECT_DIR}")
+fi
+
+cmd=(bash "${SOP_DIR}/run_mg_sop.sh" "${run_args[@]}")
+
+if [[ "${DRY}" == "yes" && "${SUBMIT}" != "yes" ]]; then
+  echo "--- 将执行的命令 ---"
+  printf '%q ' "${cmd[@]}"; echo
+  exit 0
+fi
+
+if [[ "${SUBMIT}" != "yes" ]]; then
+  echo ">>> 前台运行 run_mg_sop.sh（输出目录: ${PROJECT_DIR}）"
+  exec "${cmd[@]}"
+fi
+
+# ---- 生成 PBS 并提交 ----
+mkdir -p "${PROJECT_DIR}"
+PBS="${PROJECT_DIR}/mg-sop.pbs"
+JOBNAME="mg_$(basename "${PROJECT_DIR}" | tr -cd 'A-Za-z0-9_' | cut -c1-15)"
+{
+  echo '#!/bin/bash'
+  echo "#PBS -N ${JOBNAME}"
+  echo "#PBS -l nodes=${PBS_NODES}"
+  [[ -n "${PBS_MEM}" ]] && echo "#PBS -l mem=${PBS_MEM}"
+  echo "#PBS -l walltime=${WALLTIME}"
+  echo '#PBS -j oe'
+  echo '# 由 mg-sop 自动生成'
+  echo 'set -euo pipefail'
+  echo "PIPE_DIR=${SOP_DIR}"
+  echo "cd \"\${PIPE_DIR}\""
+  printf 'bash %q ' "${SOP_DIR}/run_mg_sop.sh"; printf '%q ' "${run_args[@]}"; echo
+} > "${PBS}"
+
+if [[ "${DRY}" == "yes" ]]; then
+  echo "--- 将生成的 PBS 内容（${PBS}）---"
+  cat "${PBS}"
+  exit 0
+fi
+
+echo ">>> PBS 已生成: ${PBS}"
+echo ">>> 提交: qsub ${PBS}"
+qsub "${PBS}"

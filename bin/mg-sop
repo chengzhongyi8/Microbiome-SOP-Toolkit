@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# mg-sop: one-command wrapper for the shotgun metagenome workflow.
+#
+# Thin wrapper around bin/run_metagenome.sh that adds:
+#   --submit / --pbs-nodes / --pbs-mem / --walltime   generate a PBS script
+#                                                     and qsub it on a cluster
+#   --dry-run          print the command that would run, do not execute
+#   --init-config      write a personal defaults file (~/.mg-sop.conf)
+#                      with your usual cluster/thread settings
+#
+# Usage:
+#   mg-sop --input DIR [options]
+#   mg-sop --input DIR --config config/metagenome_config.yaml --submit
+#
+# Required:
+#   --input DIR         reads directory (*_1.fq.gz / *_2.fq.gz)
+#   --project-dir DIR   output root (default: <input dir>_mg_out next to data)
+#
+# All run_metagenome.sh options are accepted unchanged
+# (--qc-needed/--host-genome/--host-fasta/--assembly/--cluster/--quant/
+#  --taxonomy/--function/--binning/--binners/--threads/--jobs/--conda-sh/
+#  --config ...).  See: bash bin/run_metagenome.sh --help
+#
+# Personal defaults file ~/.mg-sop.conf (CLI flags win):
+#   MG_SOP_THREADS=16
+#   MG_SOP_OUTPUT_ROOT=/path/to/results     # default output root
+#   MG_SOP_PBS_NODES=1:ppn=32
+#   MG_SOP_PBS_MEM=
+#   MG_SOP_WALLTIME=168:00:00
+#   MG_SOP_CONDA_SH=/path/to/conda.sh
+set -euo pipefail
+
+# resolve real location through symlinks
+_SRC="${BASH_SOURCE[0]}"
+while [[ -L "${_SRC}" ]]; do
+  _TGT="$(readlink "${_SRC}")"
+  if [[ "${_TGT}" == /* ]]; then _SRC="${_TGT}"
+  else _SRC="$(cd "$(dirname "${_SRC}")" && pwd)/${_TGT}"; fi
+done
+SCRIPT_DIR="$(cd "$(dirname "${_SRC}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKFLOW_DIR="${ROOT_DIR}/workflows/metagenome"
+CONF="${MG_SOP_CONF:-${HOME}/.mg-sop.conf}"
+
+[[ -f "${CONF}" ]] && source "${CONF}"
+THREADS="${MG_SOP_THREADS:-}"
+OUTPUT_ROOT="${MG_SOP_OUTPUT_ROOT:-}"
+PBS_NODES="${MG_SOP_PBS_NODES:-1:ppn=32}"
+PBS_MEM="${MG_SOP_PBS_MEM:-}"
+WALLTIME="${MG_SOP_WALLTIME:-168:00:00}"
+CONDA_SH="${MG_SOP_CONDA_SH:-}"
+
+SUBMIT=no; DRY=no; INPUT=""; PROJECT_DIR=""; SEEN_THREADS=no; SEEN_CONDA=no; SEEN_PROJECT=no
+run_args=()
+
+usage() {
+  sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
+if [[ "${1:-}" == "--init-config" ]]; then
+  if [[ -f "${CONF}" ]]; then echo "Config file already exists: ${CONF} (not overwritten)"; exit 0; fi
+  cat > "${CONF}" <<CONFEOF
+# mg-sop personal defaults (CLI flags override these)
+MG_SOP_THREADS=16
+# default output root: leave empty to place results next to the data dir
+MG_SOP_OUTPUT_ROOT=
+MG_SOP_PBS_NODES=1:ppn=32
+MG_SOP_PBS_MEM=
+MG_SOP_WALLTIME=168:00:00
+MG_SOP_CONDA_SH=
+CONFEOF
+  echo "Wrote config template: ${CONF} (edit and re-run)"
+  exit 0
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --submit)         SUBMIT=yes; shift ;;
+    --dry-run)        DRY=yes; shift ;;
+    --pbs-nodes)      PBS_NODES="${2:?missing --pbs-nodes}"; shift 2 ;;
+    --pbs-mem)        PBS_MEM="${2:?missing --pbs-mem}"; shift 2 ;;
+    --walltime)       WALLTIME="${2:?missing --walltime}"; shift 2 ;;
+    --input)          INPUT="${2:?missing --input}"; run_args+=(--input "$2"); shift 2 ;;
+    --fastq-dir)      INPUT="${2:?missing --fastq-dir}"; run_args+=(--fastq-dir "$2"); shift 2 ;;
+    --project-dir)    PROJECT_DIR="${2:?missing --project-dir}"; SEEN_PROJECT=yes; run_args+=(--project-dir "$2"); shift 2 ;;
+    --threads)        SEEN_THREADS=yes; run_args+=(--threads "$2"); shift 2 ;;
+    --conda-sh)       SEEN_CONDA=yes; run_args+=(--conda-sh "$2"); shift 2 ;;
+    --config)         run_args+=(--config "$2"); shift 2 ;;
+    -h|--help)        usage ;;
+    --force|--check-only) run_args+=("$1"); shift ;;
+    --*)              run_args+=("$1" "${2:?missing value for $1}"); shift 2 ;;
+    *) echo "unknown argument: $1 (use -h for help)" >&2; usage ;;
+  esac
+done
+
+[[ -n "${INPUT}" && -d "${INPUT}" ]] || { echo "ERROR: need a valid --input reads directory" >&2; usage; }
+[[ -d "${WORKFLOW_DIR}" ]] || { echo "ERROR: workflow dir not found: ${WORKFLOW_DIR}" >&2; exit 1; }
+
+# inject defaults from the personal config file when not given on the CLI
+[[ "${SEEN_THREADS}" == "no" && -n "${THREADS}" ]] && run_args+=(--threads "${THREADS}")
+[[ "${SEEN_CONDA}" == "no" && -n "${CONDA_SH}" ]] && run_args+=(--conda-sh "${CONDA_SH}")
+
+# default output directory: next to the data directory
+if [[ "${SEEN_PROJECT}" == "no" ]]; then
+  if [[ -n "${OUTPUT_ROOT}" ]]; then
+    PROJECT_DIR="${OUTPUT_ROOT%/}/$(basename "${INPUT}")_mg_out"
+  else
+    PROJECT_DIR="$(cd "$(dirname "${INPUT}")" && pwd)/$(basename "${INPUT}")_mg_out"
+  fi
+  run_args+=(--project-dir "${PROJECT_DIR}")
+fi
+
+cmd=(bash "${SCRIPT_DIR}/run_metagenome.sh" "${run_args[@]}")
+
+if [[ "${DRY}" == "yes" && "${SUBMIT}" != "yes" ]]; then
+  echo "--- command that would run ---"
+  printf '%q ' "${cmd[@]}"; echo
+  exit 0
+fi
+
+if [[ "${SUBMIT}" != "yes" ]]; then
+  echo ">>> running run_metagenome.sh in the foreground (output dir: ${PROJECT_DIR})"
+  exec "${cmd[@]}"
+fi
+
+# ---- generate PBS script and submit -----------------------------------------
+mkdir -p "${PROJECT_DIR}"
+PBS="${PROJECT_DIR}/mg-sop.pbs"
+JOBNAME="mg_$(basename "${PROJECT_DIR}" | tr -cd 'A-Za-z0-9_' | cut -c1-15)"
+{
+  echo '#!/bin/bash'
+  echo "#PBS -N ${JOBNAME}"
+  echo "#PBS -l nodes=${PBS_NODES}"
+  [[ -n "${PBS_MEM}" ]] && echo "#PBS -l mem=${PBS_MEM}"
+  echo "#PBS -l walltime=${WALLTIME}"
+  echo '#PBS -j oe'
+  echo '# generated by mg-sop'
+  echo 'set -euo pipefail'
+  printf 'bash %q ' "${SCRIPT_DIR}/run_metagenome.sh"; printf '%q ' "${run_args[@]}"; echo
+} > "${PBS}"
+
+if [[ "${DRY}" == "yes" ]]; then
+  echo "--- PBS script (${PBS}) ---"
+  cat "${PBS}"
+  exit 0
+fi
+
+echo ">>> PBS script written: ${PBS}"
+echo ">>> submitting: qsub ${PBS}"
+qsub "${PBS}"

@@ -1,0 +1,16 @@
+# QC / host-removal environment (metagenome workflow, module 01).
+#
+# kneaddata (Trimmomatic + Bowtie2) + FastQC + MultiQC.
+# Used by: ENV_QC
+name: metagenome_qc
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.8
+  - kneaddata>=0.12.0
+  - fastqc>=0.12.1
+  - multiqc>=1.20
+  - trimmomatic>=0.39
+  - bowtie2>=2.5
+  - samtools>=1.17

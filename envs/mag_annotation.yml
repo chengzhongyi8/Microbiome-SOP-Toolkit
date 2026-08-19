@@ -1,0 +1,14 @@
+# MAG annotation environment (metagenome workflow, module 08).
+#
+# coverM (MAG abundance) and KofamScan (KEGG KO annotation) share this
+# environment.  KofamScan needs HMMER (hmmsearch) at runtime.
+# Used by: ENV_COVERM, ENV_KOFAM
+name: mag_annotation
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.8
+  - coverm>=0.7
+  - kofamscan>=1.3.0
+  - hmmer>=3.3

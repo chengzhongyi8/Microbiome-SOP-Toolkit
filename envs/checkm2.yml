@@ -1,0 +1,12 @@
+# CheckM2 environment (metagenome workflow, module 07 MAG quality).
+#
+# CheckM2 needs diamond + prodigal at runtime; both are declared explicitly.
+# Used by: ENV_CHECKM2
+name: checkm2
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - checkm2>=1.0.2
+  - diamond>=2.1
+  - prodigal>=2.6
