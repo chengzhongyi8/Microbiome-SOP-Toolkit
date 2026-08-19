@@ -73,6 +73,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKFLOW_DIR="$(cd "${SCRIPT_DIR}/../workflows/metagenome" && pwd)"
 source "${WORKFLOW_DIR}/config.sh"
+# Machine-level defaults (e.g. database paths, CONDA_SH): optional user file
+# ~/.microbiome-toolkit.conf — precedence: CLI > YAML config > this file > config.sh
+[[ -f "${HOME}/.microbiome-toolkit.conf" ]] && source "${HOME}/.microbiome-toolkit.conf"
 
 usage() {
   sed -n '2,100p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'

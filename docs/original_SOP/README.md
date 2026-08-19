@@ -27,3 +27,8 @@ The copies are **lightly edited** for public release:
 
 The **original directories on the user's machine were never modified**; these
 are read-only archives.
+
+> **Version note**: the archived `qiime2_amplicon_16S/README.md` references a
+> future QIIME2 distribution ("2026.4"); the production server this SOP runs
+> on uses **QIIME2 2020.11.1**, which is what the active toolkit
+> (`envs/16s.yml`, `docs/`) is pinned to.

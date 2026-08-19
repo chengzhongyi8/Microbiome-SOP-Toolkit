@@ -10,7 +10,8 @@ conda env create -f envs/<file>.yml
 All channels are `conda-forge` / `bioconda` (Linux x86_64).  Versions are
 expressed as floors (`>=`) so Conda resolves the newest compatible build while
 the workflows' tested behaviour is preserved; QIIME2 is the exception — it is
-pinned to the official 2026.4 distribution for reproducibility.
+pinned to the official **2020.11.1** core distribution (the version installed
+on the production server the SOPs were developed on).
 
 ## Which environment for which step?
 
@@ -18,7 +19,7 @@ pinned to the official 2026.4 distribution for reproducibility.
 
 | Env file | Env name | Used by | Notes |
 |---|---|---|---|
-| `16s.yml` | `qiime2` | every QIIME2 step (02–07) | Official QIIME2 **2026.4** (Rachis) amplicon distribution, vendored from `qiime2/distributions` (full pinning, ~680 deps). Includes q2-dada2, q2-feature-classifier, q2-taxa, q2-phylogeny, q2-cutadapt, q2-alignment, MAFFT, FastTree, biom-format. |
+| `16s.yml` | `qiime2` | every QIIME2 step (02–07) | Official QIIME2 **2020.11.1** core distribution (Python 3.6), vendored from `https://data.qiime2.org/distro/core/qiime2-2020.11-py36-linux-conda.yml` (fully pinned, 432 deps). Includes q2-dada2, q2-feature-classifier, q2-taxa, q2-phylogeny, q2-cutadapt, q2-alignment, q2-diversity, MAFFT, FastTree, biom-format. If your server already has QIIME2, point `--qiime2-env` at it and skip creating this environment. |
 | `microeco.yml` | `microeco` | final `file2meco` validation (step 07, optional) | R + phyloseq/dada2; `file2meco`/`microeco` are installed from GitHub (see below). |
 
 ```bash
@@ -77,6 +78,6 @@ The environment names above are the defaults in
 - **Python helper scripts** in `workflows/metagenome/bin/*.py` use the Python
   standard library only (Python ≥ 3.6); no extra pip packages are needed.
 - The `16s.yml` file is the unmodified official
-  `rachis-qiime2-linux-64-conda.yml` (QIIME2 2026.4, Rachis) from
-  https://github.com/qiime2/distributions (tag `2026.4`).  It is vendored so
-  the repository is reproducible without extra network access to QIIME2.
+  `qiime2-2020.11-py36-linux-conda.yml` (QIIME2 2020.11.1, core distribution)
+  from https://data.qiime2.org/distro/core/.  It is vendored so the repository
+  is reproducible without extra network access to QIIME2.

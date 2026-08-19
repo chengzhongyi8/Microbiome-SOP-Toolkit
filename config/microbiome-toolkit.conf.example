@@ -1,0 +1,41 @@
+# ============================================================================
+# ~/.microbiome-toolkit.conf — machine-level defaults (optional)
+#
+# Copy to $HOME/.microbiome-toolkit.conf and edit once per server.  Values here
+# apply to EVERY project of BOTH workflows.  Precedence (low -> high):
+#   config.sh defaults < this file < per-project YAML config < CLI flags
+#
+# Typical use: set database paths and conda once, so project YAML configs only
+# need the per-project bits (input/output/region/module switches).
+# ============================================================================
+
+# --- conda ---------------------------------------------------------------
+CONDA_SH=/opt/anaconda3/etc/profile.d/conda.sh
+# CONDA_MODULE=            # e.g. miniconda, only if your cluster loads conda as a module
+
+# --- 16S databases --------------------------------------------------------
+# CLASSIFIER=/path/to/silva-138-99-515-806-nb-classifier.qza
+
+# --- metagenome databases ---------------------------------------------------
+# HOST_DB_DIR=/path/to/databases/host_db
+# NR_DMND=/path/to/databases/nr.dmnd
+# MEGAN_MAP=/path/to/databases/prot_acc2tax.abin
+# BLAST2LCA=/path/to/megan/tools/blast2lca
+# EGGNOG_DATA_DIR=/path/to/databases/eggnog
+# CHECKM2_DB=/path/to/databases/checkm2
+# GTDBTK_DATA_PATH=/path/to/databases/gtdbtk
+# KOFAM_PROFILE=/path/to/databases/kofam/profiles
+# KOFAM_KO_LIST=/path/to/databases/kofam/ko_list
+# KEGG_MODULE_DEF=/path/to/databases/kegg/module.ko
+# KEGG_PATHWAY_DEF=/path/to/databases/kegg/ko00001.keg
+
+# --- environment names (if you named the conda envs differently) -----------
+# QIIME2_ENV=qiime2
+# ENV_QC=metagenome_qc
+# ENV_EGGNOG=metagenome_eggnog
+# ENV_METAWRAP=metawrap
+# ENV_CHECKM2=checkm2
+# ENV_DREP=drep
+# ENV_GTDBTK=gtdbtk
+# ENV_COVERM=mag_annotation
+# ENV_KOFAM=mag_annotation

@@ -195,7 +195,7 @@ manifest.tsv ── 01 make manifest ──► results/qc/input_check.ok
 
 ## Software used
 
-QIIME2 **2026.4** (Rachis) amplicon distribution (env `qiime2`): q2cli,
+QIIME2 **2020.11.1** core distribution (env `qiime2`; matches the server version the SOP was validated on): q2cli,
 q2-demux, q2-cutadapt (cutadapt), q2-dada2 (R dada2), q2-feature-table,
 q2-metadata, q2-feature-classifier (scikit-learn), q2-taxa, q2-phylogeny
 (MAFFT, FastTree), q2-diversity, biom-format.  Optional R (env `microeco`):

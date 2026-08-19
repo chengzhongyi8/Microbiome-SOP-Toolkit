@@ -59,6 +59,9 @@ TRUNC_LEN_R_DEFAULT="${TRUNC_LEN_R:-}"
 MAX_EE_DEFAULT="${MAX_EE}"
 TRIM_LEFT_F_CLI=""; TRIM_LEFT_R_CLI=""; TRUNC_LEN_F_CLI=""; TRUNC_LEN_R_CLI=""; MAX_EE_CLI=""
 [[ -f "${WORKFLOW_DIR}/config.local.sh" ]] && source "${WORKFLOW_DIR}/config.local.sh"
+# Machine-level defaults (e.g. database paths, CONDA_SH): optional user file
+# ~/.microbiome-toolkit.conf — precedence: CLI > YAML config > this file > config.sh
+[[ -f "${HOME}/.microbiome-toolkit.conf" ]] && source "${HOME}/.microbiome-toolkit.conf"
 
 usage() {
   sed -n '2,50p' "${SCRIPT_DIR}/run_16s.sh" | sed 's/^# \{0,1\}//'

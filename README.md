@@ -23,7 +23,7 @@ Two standardized, parameterized bioinformatics pipelines:
 | Input | paired/single-end FASTQ + (optional) metadata | paired-end reads (optionally + host genome) |
 | Steps | import → quality QC → primer trim → DADA2 → taxonomy → phylogeny → microeco export | QC/dehost → MEGAHIT assembly → gene catalog → quantification → taxonomy → function → MAG binning → MAG annotation |
 | Output | QIIME2 artifacts + file2meco-ready inputs | gene/abundance/taxonomy/function tables + MAGs + annotations |
-| Key tools | QIIME2 2026.4 (q2-dada2, q2-feature-classifier, q2-phylogeny, ...), file2meco/microeco | kneaddata, MEGAHIT, Prodigal, MMseqs2/CD-HIT, Salmon/BWA, DIAMOND+MEGAN, eggNOG-mapper, MetaWRAP, dRep, CheckM2, GTDB-Tk, KofamScan, coverM |
+| Key tools | QIIME2 2020.11.1 (q2-dada2, q2-feature-classifier, q2-phylogeny, ...), file2meco/microeco | kneaddata, MEGAHIT, Prodigal, MMseqs2/CD-HIT, Salmon/BWA, DIAMOND+MEGAN, eggNOG-mapper, MetaWRAP, dRep, CheckM2, GTDB-Tk, KofamScan, coverM |
 
 Both workflows were packaged from **actual research SOPs** (see
 `docs/original_SOP/`), preserving the original analysis logic while removing
@@ -33,7 +33,7 @@ and reproducible Conda environments.
 ### Highlights
 
 - **Reproducible** — Conda environments in `envs/` (QIIME2 fully pinned to the
-  official 2026.4 distribution), software versions recorded per run
+  official 2020.11.1 distribution), software versions recorded per run
   (`results/software_versions.tsv`).
 - **Standardized** — identical parameter model for every step; YAML config
   files plus CLI flags.
@@ -109,7 +109,7 @@ conda info --base                      # e.g. /opt/anaconda3
 # CONDA_SH = <that path>/etc/profile.d/conda.sh
 ```
 
-**16S workflow** (QIIME2 2026.4 official distribution + optional R env):
+**16S workflow** (QIIME2 2020.11.1 official core distribution + optional R env; if you already have a QIIME2 environment on your server, just point `--qiime2-env` at it and skip this step):
 
 ```bash
 conda env create -n qiime2 --file envs/16s.yml

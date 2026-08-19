@@ -95,14 +95,23 @@ Suggested modification / Priority** (Critical · Recommended · Optional).
   defaults only via `~/.qiime2-sop.conf`.
 - **Status**: FIXED in `bin/qiime2-sop`.  Priority: **Recommended**.
 
-### A8. Version note in original README
+### A8. QIIME2 version follows the server installation
 
-- **Issue**: the original README said "QIIME2 2026.4 amplicon (py38)" — the
-  2026.4 distribution renamed "amplicon" → "qiime2" (Rachis) and uses its own
-  pinned env file (no py38 tag).
-- **Suggested modification**: vendor the official 2026.4 distro file
-  (`envs/16s.yml`) and document it.
-- **Status**: DONE (`envs/16s.yml` is the official `rachis-qiime2-linux-64-conda.yml`).
+- **Issue**: the original README mentioned a specific future distribution;
+  the pipeline must work with the QIIME2 version actually installed on the
+  production server.
+- **Current implementation**: the server runs **QIIME2 2020.11.1** (core
+  distribution, Python 3.6).  All QIIME2 commands used by this pipeline
+  (import, demux summarize, cutadapt trim-paired, dada2 denoise-paired,
+  classify-sklearn, taxa filter-table/filter-seqs, phylogeny
+  align-to-tree-mafft-fasttree, diversity actions, tools peek/export) exist in
+  2020.11.1.
+- **Suggested modification**: pin `envs/16s.yml` to the official
+  `qiime2-2020.11-py36-linux-conda.yml` (vendor of
+  `https://data.qiime2.org/distro/core/qiime2-2020.11-py36-linux-conda.yml`)
+  so fresh installs match the server; users with an existing QIIME2
+  environment just set `--qiime2-env`.
+- **Status**: DONE (`envs/16s.yml` = official 2020.11 core distro, fully pinned).
   Priority: **Recommended**.
 
 ---
@@ -202,7 +211,7 @@ Suggested modification / Priority** (Critical · Recommended · Optional).
 
 ## D. What was deliberately NOT changed
 
-- All core software choices (QIIME2 2026.4 pipeline; kneaddata → MEGAHIT →
+- All core software choices (QIIME2 2020.11.1 pipeline; kneaddata → MEGAHIT →
   Prodigal → MMseqs2/CD-HIT → Salmon/BWA → DIAMOND+MEGAN → eggNOG → MetaWRAP
   binning → dRep → CheckM2 → GTDB-Tk/KofamScan/CoverM).
 - All QC thresholds and filtering logic (DADA2 defaults, `MAX_EE=2.0`,
