@@ -1,9 +1,7 @@
 # Microbiome-SOP-Toolkit
 
-**Reproducible, parameterized, Linux/HPC-friendly workflows for 16S rRNA
-amplicon and shotgun metagenomic sequencing — packaged from real research
-SOPs into Conda environments, a unified CLI, YAML configuration, and full
-documentation.**
+**This is a reproducible, parameterized workflows for 16S rRNA
+amplicon and shotgun metagenomic sequencing**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
