@@ -85,8 +85,13 @@ dist/
 *.docx
 *.xlsx
 *.png
+!docs/images/toolkit-overview.png
 *.jpg
 *.jpeg
 *.tiff
 kegg_download/
 .private*/
+
+# github-connect runtime files
+tools/.github-connect.pid
+tools/.github-connect.log

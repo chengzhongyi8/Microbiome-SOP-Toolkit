@@ -5,6 +5,10 @@ amplicon and shotgun metagenomic sequencing**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+<p align="center">
+  <img src="docs/images/toolkit-overview.png" alt="Microbiome-SOP-Toolkit overview" width="80%">
+</p>
+
 ```text
 microbiome-toolkit 16s        → QIIME2-based 16S amplicon pipeline
 microbiome-toolkit metagenome → shotgun metagenomics pipeline (8 modules)
