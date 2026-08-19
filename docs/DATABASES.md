@@ -10,6 +10,14 @@ General rule: keep databases outside the pipeline directory (e.g.
 `/path/to/databases/...`) so that syncing/updating the pipeline never
 overwrites them.
 
+### One place to set database paths per server
+
+Copy `config/microbiome-toolkit.conf.example` to `~/.microbiome-toolkit.conf`
+and set every database path once.  Both workflows source this file
+automatically, so per-project YAML configs only need the project-specific
+bits.  Precedence: CLI flags > project YAML (`--config`) > `~/.microbiome-toolkit.conf`
+> `config.sh` defaults.
+
 ---
 
 ## 16S workflow

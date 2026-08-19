@@ -1,12 +1,15 @@
 # Parameter reference
 
 Every parameter of both workflows is listed below with its CLI flag, YAML
-config key, default value and an example.  Three ways to set parameters
+config key, default value and an example.  Four ways to set parameters
 (precedence low → high):
 
 1. `config.sh` defaults (edit only if you really want new defaults);
-2. YAML config file: `--config FILE.yaml` (see `config/*.example.yaml`);
-3. CLI flags — always win.
+2. `~/.microbiome-toolkit.conf` — optional machine-level defaults (database
+   paths, CONDA_SH, environment names) applied to every project on that
+   server; see `config/microbiome-toolkit.conf.example`;
+3. YAML config file: `--config FILE.yaml` (see `config/*.example.yaml`);
+4. CLI flags — always win.
 
 Values can also be exported as environment variables with the same names as
 the internal variables (e.g. `export CONDA_SH=/path/to/conda.sh`).
