@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# qiime2-sop: one-command wrapper for the 16S amplicon workflow.
+# qiime2-sop: wrapper for the 16S amplicon workflow (LEGACY ALIAS).
+#
+# Equivalent to: microbiome-toolkit 16s ...   (the unified CLI delegates here).
+# Kept as a standalone name for backward compatibility.
 #
 # Thin wrapper around bin/run_16s.sh that adds:
 #   --submit / --pbs-nodes / --pbs-mem / --walltime   generate a PBS script
@@ -11,6 +14,7 @@
 # Usage:
 #   qiime2-sop --input DIR --region REGION --classifier CLS.qza [options]
 #   qiime2-sop --input DIR --config config/16s_config.yaml --submit
+#   # or equivalently: microbiome-toolkit 16s <same options>
 #
 # Required:
 #   --input DIR         FASTQ directory (top level, *_R1.fastq.gz / *_R2.fastq.gz)

@@ -10,7 +10,7 @@ module.
 |---|---|
 | `microbiome-toolkit metagenome --help` | one-command pipeline (module 01–08) |
 | `bash bin/run_metagenome.sh --help` | plain driver |
-| `mg-sop --input DIR ...` | wrapper with `--submit` (PBS), `--dry-run`, `--init-config` |
+| `microbiome-toolkit metagenome --input DIR ... --submit` | PBS submission (`mg-sop` is a compatibility alias) |
 | `bash bin/run_metagenome.sh --check-only` | validate inputs/params without running modules |
 
 ---

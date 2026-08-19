@@ -28,7 +28,7 @@ the internal variables (e.g. `export CONDA_SH=/path/to/conda.sh`).
 
 ---
 
-## 16S workflow (`microbiome-toolkit 16s` / `run_16s.sh` / `qiime2-sop`)
+## 16S workflow (`microbiome-toolkit 16s` / `run_16s.sh`; `qiime2-sop` = legacy alias)
 
 ### Paths & input
 
@@ -85,12 +85,13 @@ the internal variables (e.g. `export CONDA_SH=/path/to/conda.sh`).
 | `--resume yes\|no` | skip steps whose outputs exist | no | `yes` | `runtime.resume` | `--resume no` |
 | (no flag) | gzip integrity check / read counting | no | no / yes | `runtime.check_gzip_integrity`, `runtime.count_reads` | – |
 
-qiime2-sop extra flags: `--submit`, `--pbs-nodes N`, `--pbs-mem MEM`,
-`--walltime HH:MM:SS`, `--dry-run`, `--init-config`.
+Cluster flags on the unified CLI: `--submit`, `--pbs-nodes N`, `--pbs-mem MEM`,
+`--walltime HH:MM:SS`, `--dry-run`, `--init-config` (also available via the
+`qiime2-sop` alias).
 
 ---
 
-## Metagenome workflow (`microbiome-toolkit metagenome` / `run_metagenome.sh` / `mg-sop`)
+## Metagenome workflow (`microbiome-toolkit metagenome` / `run_metagenome.sh`; `mg-sop` = legacy alias)
 
 ### Paths & input
 
@@ -191,5 +192,6 @@ qiime2-sop extra flags: `--submit`, `--pbs-nodes N`, `--pbs-mem MEM`,
 | `--memory-gb N` | memory hint (binning) | no | `64` | `resources.memory_gb` | `--memory-gb 128` |
 | `--resume yes\|no` | skip completed modules (marker files) | no | `yes` | `runtime.resume` | `--resume no` |
 
-mg-sop extra flags: `--submit`, `--pbs-nodes N`, `--pbs-mem MEM`,
-`--walltime HH:MM:SS`, `--dry-run`, `--init-config`.
+Cluster flags on the unified CLI: `--submit`, `--pbs-nodes N`, `--pbs-mem MEM`,
+`--walltime HH:MM:SS`, `--dry-run`, `--init-config` (also available via the
+`mg-sop` alias).

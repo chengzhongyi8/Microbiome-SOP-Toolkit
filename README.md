@@ -38,7 +38,8 @@ and reproducible Conda environments.
 - **Parameterized** — no hard-coded absolute paths; databases are configured
   once per project (never committed).
 - **Linux / HPC friendly** — pure bash + conda; PBS submission via
-  `qiime2-sop --submit` / `mg-sop --submit`; per-module conda environments.
+  `microbiome-toolkit 16s --submit` / `microbiome-toolkit metagenome --submit`;
+  per-module conda environments.
 - **Safe to rerun** — resume markers, per-step logs, `--force`, and clear
   errors instead of silent failures.
 
@@ -189,8 +190,8 @@ microbiome-toolkit metagenome --config metagenome_config.yaml
 ### Cluster (PBS) submission
 
 ```bash
-qiime2-sop --input data/fastq --region 16S_V4 --classifier CLS.qza --submit
-mg-sop --input data/reads --host-genome /db/host_db/wheat/wheat --submit
+microbiome-toolkit 16s --input data/fastq --region 16S_V4 --classifier CLS.qza --submit
+microbiome-toolkit metagenome --input data/reads --host-genome /db/host_db/wheat/wheat --submit
 ```
 
 Add `--dry-run` to preview the command or PBS script without running anything.
@@ -234,8 +235,8 @@ Microbiome-SOP-Toolkit/
 │   ├── microbiome-toolkit      # unified dispatcher
 │   ├── run_16s.sh              # 16S driver (pure CLI / --config)
 │   ├── run_metagenome.sh       # metagenome driver (pure CLI / --config)
-│   ├── qiime2-sop              # 16S wrapper (--submit/PBS, --dry-run)
-│   ├── mg-sop                  # metagenome wrapper (--submit/PBS, --dry-run)
+│   ├── qiime2-sop              # alias of 'microbiome-toolkit 16s' (compat)
+│   ├── mg-sop                  # alias of 'microbiome-toolkit metagenome' (compat)
 │   └── yaml2env.py             # YAML config -> env (stdlib only)
 ├── workflows/
 │   ├── 16s/                    # steps 00-09, primers.tsv, activate scripts

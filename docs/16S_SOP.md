@@ -9,7 +9,7 @@ step does, which software it calls, what it consumes and what it produces.
 |---|---|
 | `microbiome-toolkit 16s --help` | one-command pipeline (import → … → summary) |
 | `bash bin/run_16s.sh --help` | same pipeline, plain driver |
-| `qiime2-sop --input DIR --region 16S_V4 --classifier CLS.qza` | wrapper with `--submit` (PBS) |
+| `microbiome-toolkit 16s --input DIR --region 16S_V4 --classifier CLS.qza --submit` | PBS submission (`qiime2-sop` is a compatibility alias) |
 | two-stage manual mode | `bash workflows/16s/run_qc.sh` then, after inspecting `results/qc/demux.qzv`, `bash workflows/16s/run_after_qc.sh` |
 
 ---

@@ -72,7 +72,7 @@ fi
 # ---- 4. CLI help ----------------------------------------------------------------
 echo "[test] CLI entry points"
 "${ROOT}/bin/microbiome-toolkit" --help > /dev/null 2>&1 && ok "microbiome-toolkit --help" || fail "microbiome-toolkit --help"
-"${ROOT}/bin/microbiome-toolkit" --version | grep -q "1.0.0" && ok "microbiome-toolkit --version" || fail "--version"
+out="$("${ROOT}/bin/microbiome-toolkit" --version 2>&1)" && grep -qE "^Microbiome-SOP-Toolkit [0-9]+\.[0-9]+\.[0-9]+$" <<< "${out}" && ok "microbiome-toolkit --version" || fail "--version"
 out="$("${ROOT}/bin/microbiome-toolkit" list 2>&1)" && grep -q "metagenome" <<< "${out}" && ok "microbiome-toolkit list" || fail "list"
 "${ROOT}/bin/microbiome-toolkit" 16s --help > /dev/null 2>&1 && ok "16s --help" || fail "16s --help"
 "${ROOT}/bin/microbiome-toolkit" metagenome --help > /dev/null 2>&1 && ok "metagenome --help" || fail "metagenome --help"

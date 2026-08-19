@@ -2,7 +2,8 @@
 # ============================================================================
 # microbiome-toolkit — unified entry point for the Microbiome-SOP-Toolkit.
 #
-# Two standardized workflows are provided:
+# Two standardized workflows are provided (each with a plain-run mode and a
+# PBS-cluster submission mode):
 #
 #   16s        - QIIME2-based 16S rRNA amplicon analysis
 #                (import -> primer trim -> DADA2 -> taxonomy -> phylogeny
@@ -12,20 +13,33 @@
 #                 -> taxonomy -> function -> MAG binning -> MAG annotation)
 #
 # Usage:
-#   microbiome-toolkit <workflow> [options]      run a workflow
-#   microbiome-toolkit init-config [workflow]    copy example YAML config(s)
-#   microbiome-toolkit list                      list workflows & entry points
-#   microbiome-toolkit --help / -h               this help
-#   microbiome-toolkit --version                 version
+#   microbiome-toolkit <workflow> [options]         run a workflow
+#   microbiome-toolkit <workflow> --submit [opts]   generate a PBS script and qsub it
+#   microbiome-toolkit init-config [workflow]       copy example YAML config(s)
+#   microbiome-toolkit list                         list workflows & entry points
+#   microbiome-toolkit --help / -h                  this help
+#   microbiome-toolkit --version                    version
 #
 # Every workflow accepts `--config FILE.yaml` in addition to plain CLI flags
 # (CLI flags override config-file values).  See docs/PARAMETERS.md.
+#
+# Cluster flags (with --submit): --pbs-nodes N, --pbs-mem MEM,
+# --walltime HH:MM:SS, --dry-run (print command/PBS, do not run).
 #
 # Examples:
 #   microbiome-toolkit 16s --config config/16s_config.yaml
 #   microbiome-toolkit 16s --input data/fastq --region 16S_V4 \
 #       --classifier /db/silva.qza --output results/ --threads 16
+#   microbiome-toolkit 16s --input data/fastq --region 16S_V4 \
+#       --classifier /db/silva.qza --submit
 #   microbiome-toolkit metagenome --config config/metagenome_config.yaml
+#   microbiome-toolkit metagenome --input data/reads \
+#       --host-genome /db/host_db/wheat/wheat --submit
+#
+# Backward-compatible aliases: `qiime2-sop` == `microbiome-toolkit 16s`,
+# `mg-sop` == `microbiome-toolkit metagenome` (see bin/qiime2-sop, bin/mg-sop).
+# The plain drivers bin/run_16s.sh / bin/run_metagenome.sh are for scripting
+# and `--config`-only use.
 #
 # The script is symlink-safe: it resolves its own real location so the
 # workflow directory is always found even when invoked through a symlink in
@@ -33,7 +47,7 @@
 # ============================================================================
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 TOOLKIT_NAME="Microbiome-SOP-Toolkit"
 
 # ---- resolve real location (follow symlink chain) ---------------------------
@@ -47,7 +61,7 @@ SCRIPT_DIR="$(cd "$(dirname "${_SRC}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 cmd="${1:-}"
@@ -65,16 +79,16 @@ case "${cmd}" in
   list)
     echo "${TOOLKIT_NAME} ${VERSION}"
     echo
-    echo "Workflows:"
-    echo "  16s          QIIME2 amplicon pipeline      -> bin/run_16s.sh      (alias: qiime2-sop)"
-    echo "  metagenome   shotgun metagenomics pipeline -> bin/run_metagenome.sh (alias: mg-sop)"
+    echo "Workflows (unified CLI):"
+    echo "  microbiome-toolkit 16s [--submit] ...         QIIME2 amplicon pipeline"
+    echo "  microbiome-toolkit metagenome [--submit] ...  shotgun metagenomics pipeline"
     echo
     echo "Entry points in ${ROOT_DIR}/bin:"
-    echo "  microbiome-toolkit     this dispatcher"
-    echo "  run_16s.sh             plain 16S driver (bash)"
-    echo "  run_metagenome.sh      plain metagenome driver (bash)"
-    echo "  qiime2-sop             16S wrapper: --submit/PBS, --dry-run, --init-config"
-    echo "  mg-sop                 metagenome wrapper: --submit/PBS, --dry-run, --init-config"
+    echo "  microbiome-toolkit   unified CLI (this dispatcher)"
+    echo "  qiime2-sop           alias of 'microbiome-toolkit 16s' (kept for compatibility)"
+    echo "  mg-sop               alias of 'microbiome-toolkit metagenome' (kept for compatibility)"
+    echo "  run_16s.sh           plain 16S driver (no default output dir, no --submit)"
+    echo "  run_metagenome.sh    plain metagenome driver (no --submit)"
     exit 0
     ;;
   init-config)
@@ -97,11 +111,15 @@ case "${cmd}" in
     esac
     exit 0
     ;;
+  # The wrapper scripts handle both plain runs (default output dir, personal
+  # config) and PBS submission (--submit), so the unified CLI delegates to
+  # them; qiime2-sop / mg-sop are simply backward-compatible names for the
+  # same entry points.
   16s)
-    exec bash "${SCRIPT_DIR}/run_16s.sh" "$@"
+    exec bash "${SCRIPT_DIR}/qiime2-sop" "$@"
     ;;
   metagenome)
-    exec bash "${SCRIPT_DIR}/run_metagenome.sh" "$@"
+    exec bash "${SCRIPT_DIR}/mg-sop" "$@"
     ;;
   *)
     echo "ERROR: unknown command: ${cmd} (try: microbiome-toolkit --help)" >&2

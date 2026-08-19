@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# mg-sop: one-command wrapper for the shotgun metagenome workflow.
+# mg-sop: wrapper for the shotgun metagenome workflow (LEGACY ALIAS).
+#
+# Equivalent to: microbiome-toolkit metagenome ...   (the unified CLI delegates here).
+# Kept as a standalone name for backward compatibility.
 #
 # Thin wrapper around bin/run_metagenome.sh that adds:
 #   --submit / --pbs-nodes / --pbs-mem / --walltime   generate a PBS script
@@ -11,6 +14,7 @@
 # Usage:
 #   mg-sop --input DIR [options]
 #   mg-sop --input DIR --config config/metagenome_config.yaml --submit
+#   # or equivalently: microbiome-toolkit metagenome <same options>
 #
 # Required:
 #   --input DIR         reads directory (*_1.fq.gz / *_2.fq.gz)
